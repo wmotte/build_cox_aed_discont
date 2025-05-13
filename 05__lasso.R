@@ -51,7 +51,7 @@ all_preds <- c( "semiolmotor", "ageonset", "numaeds",
                 "etiolgenetic", "etiolmcd", "etiolstructuralother", "abnormalmri", "abnormalct",
                 "etiolencephalomalac", "etiolperiventleuk", "etiolatrophy", "numszstc_cat" )
 
-# start with univariable selection (as there is collinearity so lambda optimization does no work properly (i.e., very low number))
+# TODO lambda optimization does no work properly (i.e., very low number)) and very little Deviance variation
 sel <- read.csv( 'out.01.multivariable/significant_predictors.csv' )
 sign_preds <- sel$Predictor
 
@@ -190,105 +190,3 @@ auc_elastic <- timeROC(T = data$exit_time,
                      cause = 1,  
                      times = time_points,  
                      iid = TRUE)
-
-
-#################################
-############ FRAILY #############
-#################################
-
-
-library('coxme')
-
-# Define all potential predictors
-all_preds <- c("semiolmotor", "ageonset", "numaeds",
-               "focal", "newgen", "oldgen", "female", "fh",
-               "neonatalszs", "fs", "gt9szs", "priordc", "semiolgtc", 
-               "benign", "dd", "abnormalexam", "abnormalimaging", "eegabnormal",
-               "ageonsetcat", "eegepileptiform", "etiolunknown", "yearsszs", "yearsszfree",
-               "dc", "etiolbirthtrauma", "brainsurgery", "semiolmyoclonic", "status", 
-               "impairing", "ddd", "semioltc", "semiolabsence", "etioltbi",
-               "etiolinfxn", "etiolstructural", "yearsszfreecat", "etiolstroke", "etioltumor",
-               "etiolgenetic", "etiolmcd", "etiolstructuralother", "abnormalmri", "abnormalct",
-               "etiolencephalomalac", "etiolperiventleuk", "etiolatrophy", "numszstc_cat")
-
-# Create the survival part of the formula
-surv_part <- "Surv(entry_time, exit_time, event)"
-
-# Start with base model (only random effect)
-base_formula_str <- paste(surv_part, "~ (1 | center)")
-base_formula <- as.formula(base_formula_str)
-
-# Initialize base model to calculate initial AIC
-base_model <- tryCatch({
-    coxme(base_formula, data = data)
-}, error = function(e) {
-    stop("Error fitting base model: ", conditionMessage(e))
-})
-
-# Calculate AIC for base model
-# Note: We use the negative log-likelihood *2 + 2*df as AIC
-base_aic <- -2 * base_model$loglik[2] + 2 * (length(base_model$coefficients) + 1)
-cat("Base model AIC:", base_aic, "\n")
-
-# Initialize variables to track best model
-best_model <- base_model
-best_aic <- base_aic
-successful_preds <- c()
-
-# Try each predictor one by one
-for (pred in all_preds) {
-    print( pred )
-    # Create formula with current successful predictors plus the new one being tested
-    test_preds <- c(successful_preds, pred)
-    test_formula_str <- paste(surv_part, "~", paste(test_preds, collapse = " + "), "+ (1 | center)")
-    test_formula <- as.formula(test_formula_str)
-    
-    # Try fitting the model with the new predictor
-    model_result <- tryCatch({
-        model <- coxme(test_formula, data = data)
-        current_aic <- -2 * model$loglik[2] + 2 * (length(model$coefficients) + 1)
-        list(success = TRUE, model = model, aic = current_aic)
-    }, error = function(e) {
-        cat("Error adding predictor", pred, ":", conditionMessage(e), "\n")
-        list(success = FALSE, model = NULL, aic = Inf)
-    })
-    
-    # If successful and AIC improves, update the model
-    if (model_result$success) {
-        cat("Successfully added", pred, "- AIC:", model_result$aic, 
-            "(Change: ", model_result$aic - best_aic, ")\n")
-        
-        if (model_result$aic < best_aic) {
-            successful_preds <- test_preds
-            best_model <- model_result$model
-            best_aic <- model_result$aic
-            cat("*** Keeping", pred, "- Better AIC ***\n")
-        } else {
-            cat("Not keeping", pred, "- AIC did not improve\n")
-        }
-    }
-}
-
-# Set final model to best model found
-frailty_model_me <- best_model
-
-# Output results
-if (length(successful_preds) > 0) {
-    cat("\nFinal model includes the following predictors:\n")
-    cat(paste(successful_preds, collapse = ", "), "\n")
-    cat("Final model AIC:", best_aic, "\n")
-    cat("Improvement over base model:", best_aic - base_aic, "\n\n")
-} else {
-    cat("No predictors improved the model. Using only random effect for center.\n")
-}
-
-# Print summary of final model
-print(summary(frailty_model_me))
-
-# Create final formula string for reference
-final_formula_str <- paste(surv_part, "~", 
-                           ifelse(length(successful_preds) > 0, 
-                                  paste(successful_preds, collapse = " + "), ""), 
-                           "+ (1 | center)")
-cat("\nFinal formula:\n", final_formula_str, "\n")
-

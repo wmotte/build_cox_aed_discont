@@ -1,0 +1,7 @@
+"Metric","Value"
+"C-index","0.639 (0.622-0.657)"
+"2-Year AUC","0.662 (0.634-0.691)"
+"2-Year Sensitivity","0.704 (0.672-0.735)"
+"2-Year Specificity","0.626 (0.586-0.677)"
+"Calibration Slope","0.945 (0.824-1.062)"
+"Calibration Intercept","1.188 (0.984-1.389)"
