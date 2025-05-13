@@ -210,13 +210,8 @@ cat("\nResults saved to", outdir, "\n")
 cat("- Detailed results: majority_vote_predictors.rds\n")
 cat("- Selection frequencies: predictor_selection_frequencies.csv\n")
 
-#################################
-############ FRAILTY ############
-#################################
 
-# TODO: Add code to fit the final model using the majority-voted predictors
-# This would replace the commented-out code at the end of the original script
-
+# sort and write to disk
 rownames( pred_freq_df ) <- NULL
 
 # double sort
